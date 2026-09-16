@@ -350,18 +350,6 @@
         <div class="chip-row" id="f-nivel"></div>
       </div>
       <div class="filter-group">
-        <h3>Región</h3>
-        <div class="chip-row" id="f-region"></div>
-      </div>
-      <div class="filter-group">
-        <h3>Tipo de bien</h3>
-        <div class="chip-row" id="f-tipo"></div>
-      </div>
-      <div class="filter-group">
-        <h3>Estado operativo</h3>
-        <div class="chip-row" id="f-oper"></div>
-      </div>
-      <div class="filter-group">
         <h3>Capas</h3>
         <div class="layer-block">
           <span class="layer-label">Cercanía a humedal</span>
@@ -371,6 +359,18 @@
           <span class="layer-label">Tasación</span>
           <div class="chip-row" id="f-tasacion"></div>
         </div>
+      </div>
+      <div class="filter-group">
+        <h3>Tipo de bien</h3>
+        <select class="f-select" id="f-tipo"><option value="">Todos los tipos</option></select>
+      </div>
+      <div class="filter-group">
+        <h3>Estado operativo</h3>
+        <select class="f-select" id="f-oper"><option value="">Todos los estados</option></select>
+      </div>
+      <div class="filter-group">
+        <h3>Región</h3>
+        <select class="f-select" id="f-region"><option value="">Todas las regiones</option></select>
       </div>
       <div class="filter-group">
         <h3>Comuna</h3>
@@ -418,7 +418,7 @@
           </div>
         </div>
         <div class="panel">
-          <h2>Metodología del modelo</h2>
+          <h2>Metodología del modelo (Glosario)</h2>
           <p class="panel-sub">Variables base que alimentan el score de atractivo comercial (fuente: hoja Variables_Modelo)</p>
           <div id="glossary"></div>
         </div>
@@ -499,7 +499,7 @@
 
   var state = {
     data: [],
-    filters:{ clasif:new Set(CLASIF_ORDER), nivel:new Set(CALIBRADO_ORDER), region:new Set(), tipo:new Set(), oper:new Set(), humedal:new Set(), tasacion:new Set(), comuna:"", supMin:0, q:"" },
+    filters:{ clasif:new Set(CLASIF_ORDER), nivel:new Set(CALIBRADO_ORDER), region:"", tipo:"", oper:"", humedal:new Set(), tasacion:new Set(), comuna:"", supMin:0, q:"" },
     allRegions:[], allTipos:[], allOper:[],
     sort:{ col:"scoreCalibrado", dir:"desc" },
     page:1, pageSize:50,
@@ -523,9 +523,9 @@
     return state.data.filter(function(d){
       if(!f.clasif.has(d.clasif)) return false;
       if(d.claseCalibrado && !f.nivel.has(d.claseCalibrado)) return false;
-      if(f.region.size && !f.region.has(d.region)) return false;
-      if(f.tipo.size && !f.tipo.has(d.tipoBien)) return false;
-      if(f.oper.size && !f.oper.has(d.operativo)) return false;
+      if(f.region && d.region !== f.region) return false;
+      if(f.tipo && d.tipoBien !== f.tipo) return false;
+      if(f.oper && d.operativo !== f.oper) return false;
       if(f.humedal.size && !f.humedal.has(d.humedalCercano)) return false;
       if(f.tasacion.size && !f.tasacion.has(d.tasacion)) return false;
       if(f.comuna && d.comuna !== f.comuna) return false;
@@ -573,15 +573,6 @@
       if(s.has(item)) s.delete(item); else s.add(item);
       if(s.size===0) CALIBRADO_ORDER.forEach(function(n){s.add(n);});
       onFilterChange();
-    });
-    buildChips("f-region", state.allRegions, function(r){ return {label:regionShort(r)+" ("+state.regionCounts[r]+")"}; }, state.filters.region, function(item){
-      toggleSetItem(state.filters.region, item); onFilterChange();
-    });
-    buildChips("f-tipo", state.allTipos, function(t){ return {label:t.charAt(0)+t.slice(1).toLowerCase()}; }, state.filters.tipo, function(item){
-      toggleSetItem(state.filters.tipo, item); onFilterChange();
-    });
-    buildChips("f-oper", state.allOper, function(o){ return {label:operLabel(o)}; }, state.filters.oper, function(item){
-      toggleSetItem(state.filters.oper, item); onFilterChange();
     });
     buildChips("f-humedal", HUMEDAL_ORDER, function(h){ return {label:HUMEDAL_META[h].label+" ("+(state.humedalCounts[h]||0)+")", color:"var("+HUMEDAL_META[h].key+")"}; }, state.filters.humedal, function(item){
       toggleSetItem(state.filters.humedal, item); onFilterChange();
@@ -715,13 +706,13 @@
 
   /* ---------------- glossary ---------------- */
   var GLOSSARY = [
-    ["TOTAL_PERS","Población total de la comuna donde se ubica el terreno. Mide el tamaño del mercado potencial a nivel comunal."],
-    ["viv_800m","Número de viviendas dentro de un radio de 800 m del terreno, ajustado por proporción del buffer. Mide densidad habitacional inmediata."],
-    ["perm_800m","Permisos de edificación dentro de 800 m del terreno. Indica actividad inmobiliaria reciente en el entorno."],
-    ["vias_m_1200m","Longitud de red vial dentro de 1.200 m del terreno. Mide accesibilidad y conectividad."],
-    ["Score_calibrado","Puntaje final del modelo (escala 1–3) en base a la tasación comercial; combina las variables anteriores."],
-    ["Zona / uso_permitido","Zonificación del plan regulador (IPT) donde cae el terreno y los usos de suelo permitidos o prohibidos en ese polígono."],
-    ["Deficit_habitacional_comunal","Déficit habitacional comunal según catastro MINVU; contextualiza la demanda de vivienda del área."],
+    ["Población comunal","Población total de la comuna donde se ubica el terreno. Mide el tamaño del mercado potencial a nivel comunal."],
+    ["Viviendas en 800 m","Número de viviendas dentro de un radio de 800 m del terreno, ajustado por proporción del buffer. Mide densidad habitacional inmediata."],
+    ["Permisos de edificación en 800 m","Permisos de edificación dentro de 800 m del terreno. Indica actividad inmobiliaria reciente en el entorno."],
+    ["Red vial en 1.200 m","Longitud de red vial dentro de 1.200 m del terreno. Mide accesibilidad y conectividad."],
+    ["Score calibrado","Puntaje final del modelo (escala 1–3) en base a la tasación comercial; combina las variables anteriores."],
+    ["Zona y uso permitido (IPT)","Zonificación del plan regulador (IPT) donde cae el terreno y los usos de suelo permitidos o prohibidos en ese polígono."],
+    ["Déficit habitacional comunal","Déficit habitacional comunal según catastro MINVU; contextualiza la demanda de vivienda del área."],
     ["Terrenos prescindibles","Terrenos que requieren resguardo o gestión patrimonial: con campamentos, en expropiación, bajo valor de mercado, restricción morfológica de faja vía o entorno de bajo desarrollo."]
   ];
   function renderGlossary(){
@@ -1064,6 +1055,24 @@
     state.tasacionCounts = {};
     rows.forEach(function(d){ if(d.tasacion) state.tasacionCounts[d.tasacion] = (state.tasacionCounts[d.tasacion]||0)+1; });
 
+    var regionSel = document.getElementById("f-region");
+    state.allRegions.forEach(function(r){
+      var opt = document.createElement("option"); opt.value = r; opt.textContent = regionShort(r)+" ("+state.regionCounts[r]+")"; regionSel.appendChild(opt);
+    });
+    regionSel.addEventListener("change", function(e){ state.filters.region = e.target.value; onFilterChange(); });
+
+    var tipoSel = document.getElementById("f-tipo");
+    state.allTipos.forEach(function(t){
+      var opt = document.createElement("option"); opt.value = t; opt.textContent = t.charAt(0)+t.slice(1).toLowerCase(); tipoSel.appendChild(opt);
+    });
+    tipoSel.addEventListener("change", function(e){ state.filters.tipo = e.target.value; onFilterChange(); });
+
+    var operSel = document.getElementById("f-oper");
+    state.allOper.forEach(function(o){
+      var opt = document.createElement("option"); opt.value = o; opt.textContent = operLabel(o); operSel.appendChild(opt);
+    });
+    operSel.addEventListener("change", function(e){ state.filters.oper = e.target.value; onFilterChange(); });
+
     var comunaSel = document.getElementById("f-comuna");
     Array.from(new Set(rows.map(function(d){return d.comuna;}).filter(Boolean))).sort().forEach(function(c){
       var opt = document.createElement("option"); opt.value = c; opt.textContent = c; comunaSel.appendChild(opt);
@@ -1077,7 +1086,10 @@
       state.filters.q = e.target.value; onFilterChange();
     });
     document.getElementById("clearFilters").addEventListener("click", function(){
-      state.filters = { clasif:new Set(CLASIF_ORDER), nivel:new Set(CALIBRADO_ORDER), region:new Set(), tipo:new Set(), oper:new Set(), humedal:new Set(), tasacion:new Set(), comuna:"", supMin:0, q:"" };
+      state.filters = { clasif:new Set(CLASIF_ORDER), nivel:new Set(CALIBRADO_ORDER), region:"", tipo:"", oper:"", humedal:new Set(), tasacion:new Set(), comuna:"", supMin:0, q:"" };
+      document.getElementById("f-region").value = "";
+      document.getElementById("f-tipo").value = "";
+      document.getElementById("f-oper").value = "";
       document.getElementById("f-comuna").value = "";
       document.getElementById("f-supmin").value = "";
       document.getElementById("globalSearch").value = "";
