@@ -918,12 +918,27 @@
     if(!markerLayer) return;
     markerLayer.clearLayers();
     ringLayer.clearLayers();
+    var latlngs = [];
     state.filtered.forEach(function(d){
       var m = markersById[String(d.id)];
-      if(m) markerLayer.addLayer(m);
+      if(m){ markerLayer.addLayer(m); latlngs.push([d.lat, d.lon]); }
       var rings = ringsById[String(d.id)];
       if(rings) rings.forEach(function(r){ ringLayer.addLayer(r); });
     });
+    fitMapToFiltered(latlngs);
+  }
+  /* Ajusta la vista del mapa real a los puntos filtrados: sin filtro activo (todo el dataset) vuelve
+     a la vista general de Chile; con filtro, encuadra los puntos resultantes (1 punto = acercamiento
+     directo, 2+ = fitBounds). No hace nada si no hay mapa cargado o no hay resultados. */
+  function fitMapToFiltered(latlngs){
+    if(!leafletMap || !latlngs.length) return;
+    if(latlngs.length === state.data.length){
+      leafletMap.setView([-38.5, -71.6], 5);
+    } else if(latlngs.length === 1){
+      leafletMap.setView(latlngs[0], Math.max(leafletMap.getZoom(), 14));
+    } else {
+      leafletMap.fitBounds(latlngs, { padding:[48,48], maxZoom:15 });
+    }
   }
   function renderMapLegend(){
     document.getElementById("mapLegend").innerHTML = CALIBRADO_ORDER.map(function(k){
@@ -1035,6 +1050,24 @@
     }
   }
 
+  /* Repuebla el <select> de Comuna según la región activa (vacío = todas). Si la comuna elegida
+     hasta ahora ya no pertenece a la región seleccionada, la resetea a "Todas las comunas". */
+  function populateComunaSelect(regionVal){
+    var comunaSel = document.getElementById("f-comuna");
+    var list = regionVal ? Array.from(state.comunasByRegion[regionVal]||[]).sort() : state.allComunas;
+    var current = comunaSel.value;
+    comunaSel.innerHTML = '<option value="">Todas las comunas</option>';
+    list.forEach(function(c){
+      var opt = document.createElement("option"); opt.value = c; opt.textContent = c; comunaSel.appendChild(opt);
+    });
+    if(current && list.indexOf(current)!==-1){
+      comunaSel.value = current;
+    } else {
+      comunaSel.value = "";
+      state.filters.comuna = "";
+    }
+  }
+
   /* ---------------- init ---------------- */
   function setView(view){
     state.view = view;
@@ -1043,7 +1076,12 @@
     document.getElementById("view-"+view).classList.add("active");
     if(view==="mapa"){
       if(!leafletMap){ initLeafletMap(); }
-      setTimeout(function(){ if(leafletMap) leafletMap.invalidateSize(); }, 0);
+      setTimeout(function(){
+        if(!leafletMap) return;
+        leafletMap.invalidateSize();
+        // el contenedor recién tomó su tamaño real; reencuadra con las medidas correctas
+        fitMapToFiltered(state.filtered.filter(function(d){return markersById[String(d.id)];}).map(function(d){return [d.lat,d.lon];}));
+      }, 0);
     }
     render();
   }
@@ -1067,7 +1105,11 @@
     state.allRegions.forEach(function(r){
       var opt = document.createElement("option"); opt.value = r; opt.textContent = regionShort(r)+" ("+state.regionCounts[r]+")"; regionSel.appendChild(opt);
     });
-    regionSel.addEventListener("change", function(e){ state.filters.region = e.target.value; onFilterChange(); });
+    regionSel.addEventListener("change", function(e){
+      state.filters.region = e.target.value;
+      populateComunaSelect(e.target.value);
+      onFilterChange();
+    });
 
     var tipoSel = document.getElementById("f-tipo");
     state.allTipos.forEach(function(t){
@@ -1081,10 +1123,15 @@
     });
     operSel.addEventListener("change", function(e){ state.filters.oper = e.target.value; onFilterChange(); });
 
-    var comunaSel = document.getElementById("f-comuna");
-    Array.from(new Set(rows.map(function(d){return d.comuna;}).filter(Boolean))).sort().forEach(function(c){
-      var opt = document.createElement("option"); opt.value = c; opt.textContent = c; comunaSel.appendChild(opt);
+    state.allComunas = Array.from(new Set(rows.map(function(d){return d.comuna;}).filter(Boolean))).sort();
+    state.comunasByRegion = {};
+    rows.forEach(function(d){
+      if(!d.region || !d.comuna) return;
+      if(!state.comunasByRegion[d.region]) state.comunasByRegion[d.region] = new Set();
+      state.comunasByRegion[d.region].add(d.comuna);
     });
+    var comunaSel = document.getElementById("f-comuna");
+    populateComunaSelect("");
     comunaSel.addEventListener("change", function(e){ state.filters.comuna = e.target.value; onFilterChange(); });
 
     document.getElementById("f-idsig2").addEventListener("input", function(e){
@@ -1101,7 +1148,7 @@
       document.getElementById("f-region").value = "";
       document.getElementById("f-tipo").value = "";
       document.getElementById("f-oper").value = "";
-      document.getElementById("f-comuna").value = "";
+      populateComunaSelect("");
       document.getElementById("f-idsig2").value = "";
       document.getElementById("f-supmin").value = "";
       document.getElementById("globalSearch").value = "";
